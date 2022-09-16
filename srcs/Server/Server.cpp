@@ -7,7 +7,6 @@ void handler(int)
     status = 1;
 }
 
-
 Server::Server(int port, string server_name, string server_password, int max_client)
 {
     this->_port = port;
@@ -66,6 +65,23 @@ void    Server::accept_new_user(void)
     FD_SET(client, &_current_sockets);
 }
 
+void    Server::exec_query(Parser &parser, int fd)
+{
+    int command_id = parser.get_command_id();
+    //!!!!!MUST CHECK IF USER IS REGISTERED!!!!!
+    switch (command_id)
+    {
+        case 0 :
+            break;
+        case 2 : //NICK COMMAND;
+            nick_command(parser, fd);
+            break;
+        case 3 : //USER COMMAND;
+            user_command(parser, fd);
+            break;
+    }
+}
+
 void    Server::handle_request(int fd)
 {
     char buffer[1024];
@@ -76,7 +92,16 @@ void    Server::handle_request(int fd)
         cout << "Error with the client";
     else
     {
-        cout << buffer << endl;
+        std::string query(buffer);
+        Parser parser;
+        parser.parse_query(query);
+        std::vector<std::string>::iterator  it = parser._parsed_query.begin();
+        for (; it != parser._parsed_query.end(); it++)
+        {
+            parser.parse_command(*it);
+            this->exec_query(parser, fd);
+            parser._command.clear();
+        }
     }
 
 }
@@ -95,7 +120,7 @@ void    Server::execute(void)
         {
             if (FD_ISSET(i, &_ready_sockets))
             {
-                if (i == this->_server)
+                if (i == this->_server) //new connection
                     accept_new_user();
                 else
                     handle_request(i);
@@ -104,9 +129,63 @@ void    Server::execute(void)
     } 
 }
 
+void    Server::send_welcome(int fd)
+{
+    std::string nick_name;
+    std::string user_name;
+    std::string ip;
+    std::vector<Client>::iterator it = this->_clients.begin();
+    for(; it != this->_clients.end(); it++)
+    {
+        if (it->_socket == fd)
+        {
+            nick_name = it->_nickname;
+            user_name = it->_user_name;
+            ip = it->_ip;
+            break;
+        }
+
+    }
+}
+
+//COMMAND
+void    Server::nick_command(Parser &parser, int fd)
+{   
+    std::vector<Client>::iterator client = this->_clients.begin();
+    for (; client != this->_clients.end(); client++)
+    {
+        if (client->_socket == fd)
+        {
+            client->_nickname = parser._command[1];
+            break;
+        }
+    }
+}
+
+void    Server::user_command(Parser &parser, int fd)
+{
+    std::vector<Client>::iterator client = this->_clients.begin();
+    for (; client != this->_clients.end(); client++)
+    {
+        if (client->_socket == fd)
+        {
+            client->_user_name = parser._command[1];
+            client->_real_name = parser._command[4].erase(0, 1);
+            this->send_welcome(fd);
+            break;
+        }
+    }
+}
+
+//UTILS
 void Server::printInfo(void)
 {
     cout << this->_port << endl;
     cout << this->_server_name << endl;
     cout << this->_server_password << endl;
 }
+
+// Client Server::get_client_by_fd(int fd)
+// {
+ 
+// }

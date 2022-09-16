@@ -17,7 +17,11 @@ class Client
         Client(int socket, std::string ip);
         ~Client();
 
-        void add_client_info(std::vector<std::string> parsed_query);                                                                   
+        //getter
+        int get_user_socket(void) { return (this->_socket); };
+        //utils
+        void    print_client_info(void);
+                                                                      
 };
 
 #endif

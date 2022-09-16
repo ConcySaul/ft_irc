@@ -29,14 +29,20 @@ class Server
 		Server();
 		Server(int port, string server_name, string server_password, int max_client);
 		~Server();
-
+        //
 		void    init(void);
         void    accept_new_user(void);
         void    handle_request(int fd);
+        void    exec_query(Parser &parser, int fd);
         void    execute(void);
-
+        void    send_welcome(int fd);
+        //COMMAND
+        void    nick_command(Parser &parser, int fd);
+        void    user_command(Parser &parser, int fd);
+        //utils
 		int     getClient(void) { return this->_client; };
         int     getServer(void) { return this->_server; };
+        Client  &get_client_by_fd(int fd);
 		void    printInfo();
 
 };
