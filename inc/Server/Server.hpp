@@ -33,12 +33,13 @@ class Server
 		void    init(void);
         void    accept_new_user(void);
         void    handle_request(int fd);
-        void    exec_query(Parser &parser, int fd);
+        void    exec_query(int fd, std::string);
         void    execute(void);
         void    send_welcome(int fd);
         //COMMAND
         void    nick_command(Parser &parser, int fd);
         void    user_command(Parser &parser, int fd);
+        void    mode_command(Parser &parser, int fd);
         //utils
 		int     getClient(void) { return this->_client; };
         int     getServer(void) { return this->_server; };

@@ -34,7 +34,7 @@ void    Parser::parse_query(std::string query)
     while ((this->_pos = query.find(this->_delimiter1)) != std::string::npos)
     {
         this->_token = query.substr(0, this->_pos);
-        this->_token.resize(this->_token.size() - 1);
+        this->_token.resize(this->_token.size());
         this->_parsed_query.push_back(this->_token);
         query.erase(0, this->_pos + this->_delimiter1.length());
     }

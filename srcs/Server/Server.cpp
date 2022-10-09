@@ -65,8 +65,10 @@ void    Server::accept_new_user(void)
     FD_SET(client, &_current_sockets);
 }
 
-void    Server::exec_query(Parser &parser, int fd)
+void    Server::exec_query(int fd, std::string command)
 {
+    Parser parser;
+    parser.parse_command(command);
     int command_id = parser.get_command_id();
     //!!!!!MUST CHECK IF USER IS REGISTERED!!!!!
     switch (command_id)
@@ -79,6 +81,9 @@ void    Server::exec_query(Parser &parser, int fd)
         case 3 : //USER COMMAND;
             user_command(parser, fd);
             break;
+        case 4 : //MODE COMMAND;
+            mode_command(parser, fd);
+            break;
     }
 }
 
@@ -86,24 +91,30 @@ void    Server::handle_request(int fd)
 {
     char buffer[1024];
     int bytes_read;
-
     bytes_read = recv(fd, buffer, 1024, 0);
     if (bytes_read <= 0)
-        cout << "Error with the client";
+        return;
     else
     {
         std::string query(buffer);
-        Parser parser;
-        parser.parse_query(query);
-        std::vector<std::string>::iterator  it = parser._parsed_query.begin();
-        for (; it != parser._parsed_query.end(); it++)
-        {
-            parser.parse_command(*it);
-            this->exec_query(parser, fd);
-            parser._command.clear();
-        }
+		size_t b = 0;
+		size_t c = 0;
+		while ((b = query.find("\n")) != std::string::npos)
+		{
+			if ((c = query.find("\r\n")) != std::string::npos)
+			{
+				std::string	command(query.substr(0, c));
+				query = query.substr(c + 2);				
+				this->exec_query(fd, command);
+			}
+			else
+			{
+				std::string	command(query.substr(0, b));
+				query = query.substr(b + 1);
+				this->exec_query(fd, command);
+			}
+		}
     }
-
 }
 
 void    Server::execute(void)
@@ -144,13 +155,19 @@ void    Server::send_welcome(int fd)
             ip = it->_ip;
             break;
         }
-
     }
+    std::string buffer("");
+    buffer.append(":").append(this->_server_name).append(" 001 ").append(nick_name).append(" :IRCoke\n");
+    buffer.append(":").append(this->_server_name).append(" 002 ").append(nick_name).append(" :THE INFAMOUS IRC CHAT WHERE YOU CAN FREELY TALK ABOUT DRUGS\n");
+    buffer.append(":").append(this->_server_name).append(" 003 ").append(nick_name).append(" :WHAT ARE YOU INTO ?\n");
+    buffer.append(":").append(this->_server_name).append(" 004 ").append(nick_name).append(" :COKE ? MDMA ? LSD ? WHATEVER...\n");
+    send(fd, buffer.c_str(), buffer.size(), 0);
 }
 
 //COMMAND
 void    Server::nick_command(Parser &parser, int fd)
 {   
+    parser.print_parsed_command();
     std::vector<Client>::iterator client = this->_clients.begin();
     for (; client != this->_clients.end(); client++)
     {
@@ -164,6 +181,7 @@ void    Server::nick_command(Parser &parser, int fd)
 
 void    Server::user_command(Parser &parser, int fd)
 {
+    parser.print_parsed_command();
     std::vector<Client>::iterator client = this->_clients.begin();
     for (; client != this->_clients.end(); client++)
     {
@@ -174,6 +192,43 @@ void    Server::user_command(Parser &parser, int fd)
             this->send_welcome(fd);
             break;
         }
+    }
+}
+
+void    Server::mode_command(Parser &parser, int fd)
+{
+    // (void)fd;
+    parser.print_parsed_command();
+    std::vector<Client>::iterator client = this->_clients.begin();
+    for (; client != this->_clients.end(); client++)
+    {
+        if (client->_nickname == parser._command[1])
+        {
+            std::string mode = parser._command[2];
+            int flag = 0;
+            size_t pos;
+            for (size_t i = 0; i < mode.length(); i++)
+            {
+                if (mode[i] == '-')
+                    flag = 0;
+                else if (mode[i] == '+')
+                    flag = 1;
+                else
+                {
+                    if (flag == 1)
+                        client->_mode.push_back(mode[i]);
+                    else if (flag == 0)
+                    {
+                        while ((pos = client->_mode.find(mode[i])) != std::string::npos)
+                        client->_mode.erase(pos, 1);
+                    }
+                }
+            }
+        }
+        std::string buffer("");
+        buffer.append(":").append(client->_nickname).append("!").append(client->_user_name).append("@").append(client->_ip).append(" MODE ").append(client->_nickname).append(" :").append(parser._command[2]);
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        break;
     }
 }
 
