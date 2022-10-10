@@ -4,6 +4,7 @@ Client::Client(int socket, std::string ip)
 {
     this->_socket = socket;
     this->_ip = ip;
+    this->_registered = 0;
 }
 
 Client::~Client()
@@ -18,12 +19,3 @@ void    Client::print_client_info(void)
     cout << "IP " << this->_ip << endl;
     cout << "SOCKET " << this->_socket << endl;
 }
-
-// void    Client::add_client_info(std::vector<std::string> parsed_query)
-// {
-//     std::vector<std::string>::iterator it = parsed_query.begin();
-//     it++;
-//     cout << endl;
-//     cout << *it << endl;
-//     return ;
-// }

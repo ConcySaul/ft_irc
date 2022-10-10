@@ -12,6 +12,7 @@ class Client
         std::string _real_name;
         std::string _ip;
         std::string _mode;
+        int         _registered;
         int         _socket;
         
     public:

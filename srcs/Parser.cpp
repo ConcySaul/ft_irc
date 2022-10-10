@@ -31,6 +31,7 @@ void    Parser::print_parsed_command(void)
 
 void    Parser::parse_query(std::string query)
 {
+    this->_parsed_query.clear();
     while ((this->_pos = query.find(this->_delimiter1)) != std::string::npos)
     {
         this->_token = query.substr(0, this->_pos);
@@ -42,6 +43,7 @@ void    Parser::parse_query(std::string query)
 
 void    Parser::parse_command(std::string command)
 {
+    this->_command.clear();
     while ((this->_pos = command.find(this->_delimiter)) != std::string::npos)
     {
         this->_token = command.substr(0, this->_pos);

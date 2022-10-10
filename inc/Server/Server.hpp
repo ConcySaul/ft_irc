@@ -37,15 +37,24 @@ class Server
         void    execute(void);
         void    send_welcome(int fd);
         //COMMAND
+        void    pass_command(Parser &parser, int fd);
         void    nick_command(Parser &parser, int fd);
         void    user_command(Parser &parser, int fd);
         void    mode_command(Parser &parser, int fd);
+        void    ping_command(Parser &parser, int fd);
+        // void    ping_command(Parser &parser, int fd);
         //utils
 		int     getClient(void) { return this->_client; };
         int     getServer(void) { return this->_server; };
-        Client  &get_client_by_fd(int fd);
+        std::vector<Client>::iterator get_client_by_fd(int fd);
 		void    printInfo();
 
 };
+
+
+#define RPL_WELCOME(servername, nick, username, ip) (":" + servername + " 001 " + nick + " :Welcome to the " + servername + " Network " + nick + "!" + username + "@" + ip + "\r\n")
+#define RPL_YOURHOST(servername, nick, version) (":" + servername + " 002 " + nick + " :Your host is " + servername + ", running version " + version + "\r\n")
+#define RPL_CREATED(servername, nick, date) (":" + servername + " 003 " + nick +  " :This server was created " + date + "\r\n")
+#define RPL_MYINFO(servername, nick, version, usr_modes, chann_modes) (":" + servername + " 004 " + nick  + " " + servername + " " + version + " " + usr_modes + " " + chann_modes + ":bklov\n")
 
 #endif
