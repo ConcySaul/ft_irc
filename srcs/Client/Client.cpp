@@ -4,7 +4,6 @@ Client::Client(int socket, std::string ip)
 {
     this->_socket = socket;
     this->_ip = ip;
-    this->_registered = 0;
 }
 
 Client::~Client()
@@ -13,9 +12,9 @@ Client::~Client()
 
 void    Client::print_client_info(void)
 {
-    cout << "NICK " << this->_nickname << endl;
-    cout << "USER_NAME " << this->_user_name << endl;
-    cout << "REAL_NAME " << this->_real_name << endl;
-    cout << "IP " << this->_ip << endl;
-    cout << "SOCKET " << this->_socket << endl;
+    cout << "NICK\t:\t" << this->_nickname << endl;
+    cout << "USER_NAME\t:\t" << this->_user_name << endl;
+    cout << "REAL_NAME\t:\t" << this->_real_name << endl;
+    cout << "IP\t:\t" << this->_ip << endl;
+    cout << "SOCKET\t:\t" << this->_socket << endl << endl;
 }

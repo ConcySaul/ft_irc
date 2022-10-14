@@ -24,6 +24,7 @@ void    Parser::print_parsed_query(void)
 void    Parser::print_parsed_command(void)
 {
     std::vector<std::string>::iterator it = this->_command.begin();
+    cout << "PARSED COMMAND :" << endl;
     for (; it != this->_command.end(); it++)
         cout << *it << " ";
     cout << endl << endl;
@@ -62,7 +63,7 @@ void     Parser::get_num_tokens(void)
 
 int    Parser::get_command_id(void)
 {
-    std::string commands[] = {"CAP", "PASS", "NICK", "USER", "MODE", "PING", "JOIN", "KICK", "WHO", "PRIVMSG",
+    std::string commands[] = {"CAP", "PASS", "NICK", "USER", "MODE", "PING", "JOIN", "PRIVMSG", "KICK", "WHO",
                                 "PART", "QUIT", "NOTICE", "TOPIC", "INVITE"};
     int i = 0;
     std::vector<std::string>::iterator it = this->_command.begin();

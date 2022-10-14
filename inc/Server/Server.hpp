@@ -3,6 +3,7 @@
 
 #include "../Tools.hpp"
 #include "../Client/Client.hpp"
+#include "../Channel.hpp"
 
 #define MAX_CLIENT 5
 
@@ -22,8 +23,12 @@ class Server
         //addr part
 		struct sockaddr_in	server_addr;
         struct sockaddr_in	client_addr;
-        //user
+        //users
         std::vector<Client>   _clients;
+        //channels
+        std::vector<Channel>   _channels;
+        //info
+        int                   _num_clients;
 
 	public :
 		Server();
@@ -33,7 +38,7 @@ class Server
 		void    init(void);
         void    accept_new_user(void);
         void    handle_request(int fd);
-        void    exec_query(int fd, std::string);
+        void    exec_query(int fd, std::string command);
         void    execute(void);
         void    send_welcome(int fd);
         //COMMAND
@@ -42,12 +47,17 @@ class Server
         void    user_command(Parser &parser, int fd);
         void    mode_command(Parser &parser, int fd);
         void    ping_command(Parser &parser, int fd);
-        // void    ping_command(Parser &parser, int fd);
+        void    join_command(Parser &parser, int fd);
+        void    privmsg_command(Parser &parser, int fd);
         //utils
 		int     getClient(void) { return this->_client; };
         int     getServer(void) { return this->_server; };
+        void    clear_all_socks();
+        Client  get_client_by_nick(std::string nick);
         std::vector<Client>::iterator get_client_by_fd(int fd);
+        std::vector<Channel>::iterator get_channel_by_name(std::string name);
 		void    printInfo();
+        void    printAllUser();
 
 };
 
