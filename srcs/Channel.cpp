@@ -4,33 +4,47 @@ Channel::Channel()
 {
     this->_channel_name = "";
     this->_num_clients = 0;
-    std::memset(&this->_clients, 0, sizeof(this->_clients));
-    std::memset(&this->_operators, 0, sizeof(this->_operators));
 }
 
-Channel::Channel(std::string name, int fd)
+Channel::Channel(std::string name, Client *client)
 {
     this->_channel_name = name;
-    this->_clients.push_back(fd);
-    this->_operators.push_back(fd);
+    this->_clients.push_back(client);
+    this->_operators.push_back(client);
     this->_num_clients = 1;
 }
 
 Channel::~Channel(){}
 
-void Channel::add_new_client(int fd)
+void Channel::add_new_client(Client *client)
 {
-    this->_clients.push_back(fd);
+    this->_clients.push_back(client);
     this->_num_clients++;
 }
 
 void Channel::send_message_to_chan(std::string buffer, int sender)
 {
-    std::vector<int>::iterator start = this->_clients.begin();
+    std::vector<Client*>::iterator start = this->_clients.begin();
     for (; start != this->_clients.end(); start++)
     {
-        if (*start == sender)
+        if ((*start)->_socket == sender)
             continue;
-        send(*start, buffer.c_str(), buffer.size(), 0);
+        send((*start)->_socket, buffer.c_str(), buffer.size(), 0);
     }
+}
+
+void Channel::print_chan_info()
+{
+    std::vector<Client*>::iterator client = this->_clients.begin();
+    std::vector<Client*>::iterator op = this->_operators.begin();
+
+    cout << "CHANNEL NAME\t:\t" << this->_channel_name << endl;
+    cout << "CLIENT CONNECTED\t:" << endl;
+    for (; client != this->_clients.end(); client++)
+        cout << (*client)->_nickname << endl;
+    cout << endl;
+    cout << "OPERATOR\t:" << endl;
+    for (; op != this->_operators.end(); op++)
+        cout << (*op)->_nickname << endl;
+    cout << endl;
 }

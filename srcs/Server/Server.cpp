@@ -111,9 +111,9 @@ void    Server::exec_query(int fd, std::string command)
         case 6 : //JOIN COMMAND
             join_command(parser, fd);
             break;
-        // case 7 : //PRIVMSG COMMAND
-        //     privmsg_command(parser, fd);
-        //     break;
+        case 7 : //PRIVMSG COMMAND
+            privmsg_command(parser, fd);
+            break;
     }
 }
 
@@ -190,8 +190,8 @@ void    Server::send_welcome(int fd)
 	buffer.append(RPL_YOURHOST(this->_server_name, client->_nickname, "InspIRCd-3"));
 	buffer.append(RPL_CREATED(this->_server_name, client->_nickname, "08:04:20 Oct 10 2022"));
 	buffer.append(RPL_MYINFO(this->_server_name, client->_nickname, "InspIRCd-3", "iosw", "biklmnopstv "));
-    cout << "SEND : " << endl;
-    cout << buffer << endl;
+    // cout << "SEND : " << endl;
+    // cout << buffer << endl;
     send(fd, buffer.c_str(), buffer.size(), 0);
 	buffer.clear();
 }
@@ -227,7 +227,7 @@ void    Server::user_command(Parser &parser, int fd)
     client->_user_name = parser._command[1];
     client->_real_name = parser._command[4].erase(0, 1);
     this->send_welcome(fd);
-    this->printAllUser();
+    // this->printAllUser();
 }
 
 void    Server::mode_command(Parser &parser, int fd)
@@ -261,8 +261,8 @@ void    Server::mode_command(Parser &parser, int fd)
         }
         std::string buffer("");
         buffer.append(":").append(client->_nickname).append("!").append(client->_user_name).append("@").append(client->_ip).append(" MODE ").append(client->_nickname).append(" :").append(parser._command[2]).append("\r\n");
-        cout << "SEND : " << endl;
-        cout << buffer << endl;
+        // cout << "SEND : " << endl;
+        // cout << buffer << endl;
         send(fd, buffer.c_str(), buffer.size(), 0);
 		buffer.clear();
         break;
@@ -274,8 +274,8 @@ void    Server::ping_command(Parser &parser, int fd)
     // parser.print_parsed_command();
     std::string buffer("");
     buffer.append(":").append(parser._command[1]).append(" PONG ").append(parser._command[1]).append(" :").append(parser._command[1]).append("\r\n");
-    cout << "SEND : " << endl;
-    cout << buffer << endl;
+    // cout << "SEND : " << endl;
+    // cout << buffer << endl;
     send(fd, buffer.c_str(), buffer.size(), 0);
     buffer.clear();
 }
@@ -283,34 +283,42 @@ void    Server::ping_command(Parser &parser, int fd)
 void    Server::join_command(Parser &parser, int fd)
 {
     // parser.print_parsed_command();
+    std::string chan_name = parser._command[1];
+    chan_name.erase(0, 1);
     std::vector<Client>::iterator client = get_client_by_fd(fd);
-    std::vector<Channel>::iterator channel = this->get_channel_by_name(parser._command[1]);
+    std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
     if (channel == this->_channels.end()) // channel doesn't exist, so we create it
     {
-        Channel new_channel(parser._command[1], fd);
+        cout << "CREATING NEW CHANNEL" << endl;
+        Channel new_channel(chan_name, client.base());
         this->_channels.push_back(new_channel);
+        new_channel.print_chan_info();
     }
-    else // channel already exists, so we add the client to it
-        channel->add_new_client(fd);
+    else
+    { // channel already exists, so we add the client to it
+        channel->add_new_client(client.base());
+        channel->print_chan_info();
+    }
     std::string buffer("");
-    buffer.append(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip + " JOIN :" + parser._command[1]);
-    cout << buffer << endl;
+    buffer.append(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip + " JOIN :" + parser._command[1]).append("\r\n");
+    // cout << buffer << endl;
     send(fd, buffer.c_str(), buffer.size(), 0);
     buffer.clear();
+    
 }
 
-// void    Server::privmsg_command(Parser &parser, int fd)
-// {
-//     cout << "PRIVMSG MG" << endl;
-//     std::string chan_name = parser._command[1];
-//     chan_name.erase(0, 1);
-//     std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
-//     std::string buffer(parser._command[2].erase(0, 1));
-//     size_t i = 3;
-//     for (; i < parser._command.size(); i++)
-//         buffer.append(" " + parser._command[i]);
-//     channel->send_message_to_chan(buffer, fd);
-// }
+void    Server::privmsg_command(Parser &parser, int fd)
+{
+    std::string chan_name = parser._command[1];
+    chan_name.erase(0, 1);
+    std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
+    std::string buffer(parser._command[2].erase(0, 1));
+    size_t i = 3;
+    for (; i < parser._command.size(); i++)
+        buffer.append(" " + parser._command[i]);
+    buffer.append("\n");
+    channel->send_message_to_chan(buffer, fd);
+}
 
 //UTILS
 void Server::printInfo(void)
