@@ -22,15 +22,25 @@ void Channel::add_new_client(Client *client)
     this->_num_clients++;
 }
 
-void Channel::send_message_to_chan(std::string buffer, int sender)
+void Channel::remove_client(Client *client)
 {
     std::vector<Client*>::iterator start = this->_clients.begin();
     for (; start != this->_clients.end(); start++)
     {
-        if ((*start)->_socket == sender)
-            continue;
-        send((*start)->_socket, buffer.c_str(), buffer.size(), 0);
+        if ((*start)->_nickname == client->_nickname)
+        {
+            this->_clients.erase(start);
+            break;
+        }
     }
+}
+
+void Channel::send_message_to_chan(std::string buffer, int sender)
+{
+    (void)sender;
+    std::vector<Client*>::iterator start = this->_clients.begin();
+    for (; start != this->_clients.end(); start++)
+        send((*start)->_socket, buffer.c_str(), buffer.size(), 0);
 }
 
 void Channel::print_chan_info()

@@ -77,7 +77,7 @@ void    Server::accept_new_user(void)
     this->_clients.push_back(new_user);
 	this->_num_clients++;
     FD_SET(client, &_current_sockets);
-    this->printInfo();
+    // this->printInfo();
 }
 
 void    Server::exec_query(int fd, std::string command)
@@ -113,6 +113,15 @@ void    Server::exec_query(int fd, std::string command)
             break;
         case 7 : //PRIVMSG COMMAND
             privmsg_command(parser, fd);
+            break;
+        case 8 : //KICK COMMAND
+            kick_command(parser, fd);
+            break;
+        // case 9 : //WHO COMMAND
+        //     who_command(parser, fd);
+        //     break;
+        case 10 : //KICK COMMAND
+            part_command(parser, fd);
             break;
     }
 }
@@ -232,41 +241,35 @@ void    Server::user_command(Parser &parser, int fd)
 
 void    Server::mode_command(Parser &parser, int fd)
 {
+    //check if the client exist
     // parser.print_parsed_command();
-    std::vector<Client>::iterator client = this->_clients.begin();
-    for (; client != this->_clients.end(); client++)
+    std::vector<Client>::iterator client = get_client_by_fd(fd);
+    std::string mode = parser._command[2];
+    int flag = 0;
+    size_t pos;
+    for (size_t i = 0; i < mode.length(); i++)
     {
-        if (client->_nickname == parser._command[1])
+        if (mode[i] == '-')
+            flag = 0;
+        else if (mode[i] == '+')
+            flag = 1;
+        else
         {
-            std::string mode = parser._command[2];
-            int flag = 0;
-            size_t pos;
-            for (size_t i = 0; i < mode.length(); i++)
+            if (flag == 1)
+                client->_mode.push_back(mode[i]);
+            else if (flag == 0)
             {
-                if (mode[i] == '-')
-                    flag = 0;
-                else if (mode[i] == '+')
-                    flag = 1;
-                else
-                {
-                    if (flag == 1)
-                        client->_mode.push_back(mode[i]);
-                    else if (flag == 0)
-                    {
-                        while ((pos = client->_mode.find(mode[i])) != std::string::npos)
-                        client->_mode.erase(pos, 1);
-                    }
-                }
+                while ((pos = client->_mode.find(mode[i])) != std::string::npos)
+                client->_mode.erase(pos, 1);
             }
         }
+    }
         std::string buffer("");
         buffer.append(":").append(client->_nickname).append("!").append(client->_user_name).append("@").append(client->_ip).append(" MODE ").append(client->_nickname).append(" :").append(parser._command[2]).append("\r\n");
         // cout << "SEND : " << endl;
         // cout << buffer << endl;
         send(fd, buffer.c_str(), buffer.size(), 0);
 		buffer.clear();
-        break;
-    }
 }
 
 void    Server::ping_command(Parser &parser, int fd)
@@ -292,16 +295,15 @@ void    Server::join_command(Parser &parser, int fd)
         cout << "CREATING NEW CHANNEL" << endl;
         Channel new_channel(chan_name, client.base());
         this->_channels.push_back(new_channel);
-        new_channel.print_chan_info();
+        // new_channel.print_chan_info();
     }
     else
     { // channel already exists, so we add the client to it
         channel->add_new_client(client.base());
-        channel->print_chan_info();
+        // channel->print_chan_info();
     }
     std::string buffer("");
     buffer.append(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip + " JOIN :" + parser._command[1]).append("\r\n");
-    // cout << buffer << endl;
     send(fd, buffer.c_str(), buffer.size(), 0);
     buffer.clear();
     
@@ -309,24 +311,78 @@ void    Server::join_command(Parser &parser, int fd)
 
 void    Server::privmsg_command(Parser &parser, int fd)
 {
+    //check if the chan exist
     std::string chan_name = parser._command[1];
     chan_name.erase(0, 1);
     std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
-    std::string buffer(parser._command[2].erase(0, 1));
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
     size_t i = 3;
+    std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip + " PRIVMSG #" + chan_name + " :");
+    buffer.append(parser._command[2].erase(0, 1));
     for (; i < parser._command.size(); i++)
         buffer.append(" " + parser._command[i]);
-    buffer.append("\n");
+    buffer.append("\r\n");
+    cout << buffer << endl;
     channel->send_message_to_chan(buffer, fd);
+    buffer.clear();
 }
 
-//UTILS
+void    Server::kick_command(Parser &parser, int fd)
+{
+    //check if the client is operator
+    //check if the client is in the chan
+    //check if the client to kick is in the chan and exists
+    //check if the chan exists
+    //kick multiple client : /KICK user1,user2 chan :message
+    std::string chan_name = parser._command[1];
+    chan_name.erase(0, 1);
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+    std::vector<Client>::iterator client_to_kick = this->get_client_by_nick(parser._command[2]);
+    std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
+    std::vector<std::string>::iterator token = parser._command.begin();
+    channel->remove_client(client_to_kick.base());
+    std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip);
+    for (; token != parser._command.end(); token++)
+        buffer.append(" " + *token);
+    buffer.append("\r\n");
+    channel->send_message_to_chan(buffer, fd);
+    // channel->print_chan_info();
+}
+
+void Server::part_command(Parser &parser, int fd)
+{
+    //check if client exists
+    //check if the channel exist
+    //check if the client is in the channel
+    std::string chan_name = parser._command[1];
+    chan_name.erase(0, 1);
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+    std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
+    channel->remove_client(client.base());
+    std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip);
+    buffer.append(" PART").append(" :" + parser._command[1]).append("\r\n");
+    cout << buffer << endl;
+    send(fd, buffer.c_str(), buffer.size(), 0);
+}
+
+////////////////////////////////////////////UTILS
 void Server::printInfo(void)
 {
     cout << "SERVER PORT : " << this->_port << endl;
     cout << "SERVER NAME : " << this->_server_name << endl;
     cout << "SERVER PASS : " << this->_server_password << endl;
     cout << "CONNECTED CLIENTS : " << this->_num_clients << endl << endl;
+}
+
+std::vector<Client>::iterator Server::get_client_by_nick(std::string nick)
+{
+    std::vector<Client>::iterator client = this->_clients.begin();
+    for (; client != this->_clients.end(); client++)
+	{
+        if (client->_nickname == nick)
+			return client;
+	}
+	return this->_clients.end();
 }
 
 std::vector<Client>::iterator Server::get_client_by_fd(int fd)

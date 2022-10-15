@@ -49,18 +49,20 @@ class Server
         void    ping_command(Parser &parser, int fd);
         void    join_command(Parser &parser, int fd);
         void    privmsg_command(Parser &parser, int fd);
+        void    kick_command(Parser &parser, int fd);
+        void    who_command(Parser &parser, int fd);
+        void    part_command(Parser &parser, int fd);
         //utils
 		int     getClient(void) { return this->_client; };
         int     getServer(void) { return this->_server; };
         void    clear_all_socks();
-        Client  get_client_by_nick(std::string nick);
+        std::vector<Client>::iterator get_client_by_nick(std::string nick);
         std::vector<Client>::iterator get_client_by_fd(int fd);
         std::vector<Channel>::iterator get_channel_by_name(std::string name);
 		void    printInfo();
         void    printAllUser();
 
 };
-
 
 #define RPL_WELCOME(servername, nick, username, ip) (":" + servername + " 001 " + nick + " :Welcome to the " + servername + " Network " + nick + "!" + username + "@" + ip + "\r\n")
 #define RPL_YOURHOST(servername, nick, version) (":" + servername + " 002 " + nick + " :Your host is " + servername + ", running version " + version + "\r\n")

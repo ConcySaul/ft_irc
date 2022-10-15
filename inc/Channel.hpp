@@ -18,6 +18,7 @@ class Channel
         ~Channel();
 
         void add_new_client(Client *client);
+        void remove_client(Client *client);
         void send_message_to_chan(std::string buffer, int sender);
         
         void print_chan_info(void);
