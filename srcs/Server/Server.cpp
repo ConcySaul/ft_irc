@@ -20,8 +20,11 @@ Server::Server(int port, string server_name, string server_password, int max_cli
     this->_port = port;
     this->_server_name = server_name;
     this->_server_password = server_password;
+    this->_operator_password = "GiveMePowerBitch!";
     this->_max_client = max_client;
     this->_num_clients = 0;
+    this->_allowed_chan_mode = "n";
+    this->_allowed_client_mode = "ow";
     FD_ZERO(&_current_sockets);
     FD_ZERO(&_ready_sockets);
 }
@@ -87,19 +90,23 @@ void    Server::exec_query(int fd, std::string command)
     int command_id = parser.get_command_id();
 	std::vector<Client>::iterator client = this->get_client_by_fd(fd);
 	if (client->_nickname.empty() && command_id > 2)
-		return ;
+    {
+        std::string buffer(ERR_NOTREGISTERED(this->_server_name, ""));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
     //!!!!!MUST CHECK IF USER IS REGISTERED!!!!!
     switch (command_id)
     {
         case 0 :
             break;
-        // // case 1 : //PASS COMMAND;
-        //     pass_command(parser, fd);					  
-        //     break;
-        case 2 : //NICK COMMAND;
+        case 1 : //PASS COMMAND;
+            pass_command(parser, fd);					  
+            break;
+        case 2 : //NICK COMMAND; (set a nickname)
             nick_command(parser, fd);					  
             break;
-        case 3 : //USER COMMAND;
+        case 3 : //USER COMMAND; (ask for a connection, set the username, realname a IP)
             user_command(parser, fd);
             break;
         case 4 : //MODE COMMAND;
@@ -108,20 +115,32 @@ void    Server::exec_query(int fd, std::string command)
         case 5 : //PING COMMAND
             ping_command(parser, fd);
             break;
-        case 6 : //JOIN COMMAND
+        case 6 : //JOIN COMMAND (join a channel)
             join_command(parser, fd);
             break;
-        case 7 : //PRIVMSG COMMAND
+        case 7 : //PRIVMSG COMMAND (send a message to a channel)
             privmsg_command(parser, fd);
             break;
-        case 8 : //KICK COMMAND
+        case 8 : //KICK COMMAND //!!!!OPERATOR COMMAND!!!!!
             kick_command(parser, fd);
             break;
-        // case 9 : //WHO COMMAND
-        //     who_command(parser, fd);
-        //     break;
-        case 10 : //KICK COMMAND
+        case 9 : //PART COMMAND (leave a channel)
             part_command(parser, fd);
+            break;
+        case 10 : //QUIT COMMAND (quit the server)
+            quit_command(parser, fd);
+            break;
+        case 11 : //NOTICE COMMAND (notice a single client)
+            notice_command(parser, fd);
+            break;
+        case 12 : //OPER_COMMAND (Upgrade a client to operator)
+            oper_command(parser, fd);
+            break;
+        case 13 : //KILL_COMMAND (Upgrade a client to operator)
+            kill_command(parser, fd);
+            break;
+        case 14 : //DIE_COMMAND (Upgrade a client to operator)
+            die_command(parser, fd);
             break;
     }
 }
@@ -133,7 +152,11 @@ void    Server::handle_request(int fd)
     int bytes_read;
     bytes_read = recv(fd, buffer, 1024, 0);
     if (bytes_read <= 0)
-        return;
+    {
+        FD_CLR(fd, &_current_sockets);
+        close(fd);
+        return ;
+    }
     else
     {
         std::string query(buffer);
@@ -196,9 +219,9 @@ void    Server::send_welcome(int fd)
 	if (client == this->_clients.end())
 		return ;
     std::string buffer(RPL_WELCOME(this->_server_name, client->_nickname, client->_user_name, client->_ip));
-	buffer.append(RPL_YOURHOST(this->_server_name, client->_nickname, "InspIRCd-3"));
-	buffer.append(RPL_CREATED(this->_server_name, client->_nickname, "08:04:20 Oct 10 2022"));
-	buffer.append(RPL_MYINFO(this->_server_name, client->_nickname, "InspIRCd-3", "iosw", "biklmnopstv "));
+	buffer.append(RPL_YOURHOST(this->_server_name, client->_nickname, "IRCOKE.V1"));
+	buffer.append(RPL_CREATED(this->_server_name, client->_nickname, "27:04:27 AUG 38 2158"));
+	buffer.append(RPL_MYINFO(this->_server_name, client->_nickname, "IRCOKE.V1", "ow", "k"));
     // cout << "SEND : " << endl;
     // cout << buffer << endl;
     send(fd, buffer.c_str(), buffer.size(), 0);
@@ -206,24 +229,54 @@ void    Server::send_welcome(int fd)
 }
 
 //COMMAND
-// void    Server::pass_command(Parser &parser, int fd)
-// {   
+void    Server::pass_command(Parser &parser, int fd)
+{   
     // parser.print_parsed_command();
-//     std::vector<Client>::iterator client = get_client_by_fd(fd);
-// 	if (this->_server_password != parser._command[1])
-// 	{
-// 		std::string buffer("WRONG PASSWORD");
-// 		return ;
-// 	}
+    std::vector<Client>::iterator client = get_client_by_fd(fd);
+    if (client == this->_clients.end()) //if the client isn't connected
+    {
+        std::string buffer(ERR_NOTREGISTERED(this->_server_name, ""));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    else if (!client->_nickname.empty()) //if the user is already registered
+    {
+        std::string buffer(ERR_ALREADYREGISTERED(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    else if (parser._command[1] != this->_server_password) // if the password isn't correct
+    {
+        std::string buffer(ERR_PASSWDMISMATCH(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    client->_passed = 1;
 
-// }
+}
 
 void    Server::nick_command(Parser &parser, int fd)
 {   
     // parser.print_parsed_command();
     std::vector<Client>::iterator client = this->get_client_by_fd(fd);
-	if (client == this->_clients.end())
+	if (client == this->_clients.end())//if the client isn't connected
+    {
+        std::string buffer(ERR_NOTREGISTERED(this->_server_name, ""));
+        send(fd, buffer.c_str(), buffer.size(), 0);
 		return ;
+    }
+    else if (client->_passed == 0)//if the password isn't set
+    {
+        std::string buffer(ERR_NOTREGISTERED(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    else if (parser._command.size() != 2) // if the nickname param is missing
+    {
+        std::string buffer(ERR_NONICKNAMEGIVEN(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
 	client->_nickname = parser._command[1];
 }
 
@@ -231,8 +284,24 @@ void    Server::user_command(Parser &parser, int fd)
 {
     // parser.print_parsed_command();
     std::vector<Client>::iterator client = this->get_client_by_fd(fd);
-	if (client == this->_clients.end())
+	if (client == this->_clients.end())//if the client isn't connected
+    {
+        std::string buffer(ERR_NOTREGISTERED(this->_server_name, ""));
+        send(fd, buffer.c_str(), buffer.size(), 0);
 		return ;
+    }
+    else if (parser._command.size() < 4)//if some params are missing
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    else if (client->_user_name.empty() == 0)//the user already send the USER cmd, and so, is connected
+    {
+        std::string buffer(ERR_ALREADYREGISTERED(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
     client->_user_name = parser._command[1];
     client->_real_name = parser._command[4].erase(0, 1);
     this->send_welcome(fd);
@@ -244,9 +313,50 @@ void    Server::mode_command(Parser &parser, int fd)
     //check if the client exist
     // parser.print_parsed_command();
     std::vector<Client>::iterator client = get_client_by_fd(fd);
+    if (parser._command.size() < 3)
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    else if (parser._command[1].find("#") == std::string::npos)//USER MODE
+    {
+        this->user_mode(parser, fd);
+        return ;
+    }
+    // else if (parser._command[1].find("#") != std::string::npos)//CHANNEL MODE
+    // {
+    //     this->channel_mode(parser, fd);
+    //     return ;
+    // }
+}
+
+void Server::user_mode(Parser &parser, int fd)
+{
+    std::vector<Client>::iterator client = get_client_by_fd(fd);
+    std::vector<Client>::iterator client_to_change = get_client_by_nick(parser._command[1]);
     std::string mode = parser._command[2];
     int flag = 0;
     size_t pos;
+
+    if (parser._command.size() < 3)//missing params
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    else if (client_to_change == this->_clients.end())//client to change doesn't exist
+    {
+        std::string buffer(ERR_NOSUCHNICK(this->_server_name, client->_user_name, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    else if (client->_nickname != parser._command[1]) // if the client try to change another client's
+    {
+        std::string buffer(ERR_USERSDONTMATCH(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
     for (size_t i = 0; i < mode.length(); i++)
     {
         if (mode[i] == '-')
@@ -255,30 +365,106 @@ void    Server::mode_command(Parser &parser, int fd)
             flag = 1;
         else
         {
-            if (flag == 1)
+            if (flag == 1)// if mode is +
                 client->_mode.push_back(mode[i]);
-            else if (flag == 0)
+            else if (flag == 0)//if mode is -
             {
-                while ((pos = client->_mode.find(mode[i])) != std::string::npos)
-                client->_mode.erase(pos, 1);
+                if ((pos = client->_mode.find(mode[i])) != std::string::npos)
+                    client->_mode.erase(pos, 1);
             }
         }
     }
-        std::string buffer("");
-        buffer.append(":").append(client->_nickname).append("!").append(client->_user_name).append("@").append(client->_ip).append(" MODE ").append(client->_nickname).append(" :").append(parser._command[2]).append("\r\n");
-        // cout << "SEND : " << endl;
-        // cout << buffer << endl;
+    std::string buffer("");
+    buffer.append(":").append(client->_nickname).append("!").append(client->_user_name).append("@").append(client->_ip).append(" MODE ").append(client->_nickname).append(" :").append(mode).append("\r\n");
+    // cout << "SEND : " << endl;
+    // cout << buffer << endl;
+    send(fd, buffer.c_str(), buffer.size(), 0);
+	buffer.clear();
+}
+
+void Server::channel_mode(Parser &parser, int fd)
+{
+    std::string chan_name = parser._command[1];
+    chan_name.erase(0, 1);
+    std::vector<Client>::iterator client = get_client_by_fd(fd);
+    std::vector<Channel>::iterator channel = get_channel_by_name(chan_name);
+    std::string mode = parser._command[2];
+    int flag = 0;
+    size_t pos;
+
+    if (parser._command.size() < 3)//missing params
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
         send(fd, buffer.c_str(), buffer.size(), 0);
-		buffer.clear();
+        return;
+    }
+    else if (channel == this->_channels.end())//channel doesn't exist
+    {
+        std::string buffer(ERR_NOSUCHCHAN(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return; 
+    }
+    else if (!channel->is_in_channel(client->_nickname))//client isn't in the chan
+    {
+        std::string buffer(ERR_CANNOTSENDTOCHAN(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;   
+    }
+    else if (!channel->is_op(client->_nickname))//client isn't an operator
+    {
+        std::string buffer(ERR_CHANOPRIVSNEEDED(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;     
+    }
+    for (size_t i = 0; i < mode.length(); i++)
+    {
+        if (mode[i] == '-')
+            flag = 0;
+        else if (mode[i] == '+')
+            flag = 1;
+        else
+        {
+            if (flag == 1)// if mode is +
+                channel->_mode.push_back(mode[i]);
+            else if (flag == 0)//if mode is -
+            {
+                if ((pos = channel->_mode.find(mode[i])) != std::string::npos)
+                    channel->_mode.erase(pos, 1);
+            }
+        }
+    }
+    std::string buffer("");
+    buffer.append(":").append(client->_nickname).append("!").append(client->_user_name).append("@").append(client->_ip).append(" MODE ").append(client->_nickname).append(" :").append(mode).append("\r\n");
+    // cout << "SEND : " << endl;
+    // cout << buffer << endl;
+    send(fd, buffer.c_str(), buffer.size(), 0);
+	buffer.clear();
 }
 
 void    Server::ping_command(Parser &parser, int fd)
 {
     // parser.print_parsed_command();
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+	if (client == this->_clients.end())//if the client isn't connected
+    {
+        std::string buffer(ERR_NOTREGISTERED(this->_server_name, ""));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    else if (parser._command.size() < 2) // if the server to ping param is missing
+    {
+        std::string buffer(ERR_NOORIGIN(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    else if (parser._command[1] != this->_server_name)//if the server ping is not our server
+    {
+        std::string buffer(ERR_NOSUCHSERVER(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
     std::string buffer("");
     buffer.append(":").append(parser._command[1]).append(" PONG ").append(parser._command[1]).append(" :").append(parser._command[1]).append("\r\n");
-    // cout << "SEND : " << endl;
-    // cout << buffer << endl;
     send(fd, buffer.c_str(), buffer.size(), 0);
     buffer.clear();
 }
@@ -290,6 +476,12 @@ void    Server::join_command(Parser &parser, int fd)
     chan_name.erase(0, 1);
     std::vector<Client>::iterator client = get_client_by_fd(fd);
     std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
+    if (parser._command.size() < 2)//not enough parameters
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
     if (channel == this->_channels.end()) // channel doesn't exist, so we create it
     {
         cout << "CREATING NEW CHANNEL" << endl;
@@ -297,8 +489,8 @@ void    Server::join_command(Parser &parser, int fd)
         this->_channels.push_back(new_channel);
         // new_channel.print_chan_info();
     }
-    else
-    { // channel already exists, so we add the client to it
+    else // channel already exists, so we add the client to it
+    {
         channel->add_new_client(client.base());
         // channel->print_chan_info();
     }
@@ -316,30 +508,80 @@ void    Server::privmsg_command(Parser &parser, int fd)
     chan_name.erase(0, 1);
     std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
     std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+    if (parser._command.size() < 3) // missing param
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    if (channel == this->_channels.end())//if channel doesn't exist
+    {
+        std::string buffer(ERR_NOSUCHCHAN(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    if (!channel->is_in_channel(client->_nickname) && (channel->_mode.find("n") != std::string::npos))//the client isnt't in the channel and the n mode is enabled
+    {
+        std::string buffer(ERR_CANNOTSENDTOCHAN(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return; 
+    }
     size_t i = 3;
     std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip + " PRIVMSG #" + chan_name + " :");
     buffer.append(parser._command[2].erase(0, 1));
     for (; i < parser._command.size(); i++)
         buffer.append(" " + parser._command[i]);
     buffer.append("\r\n");
-    cout << buffer << endl;
+    // cout << buffer << endl;
     channel->send_message_to_chan(buffer, fd);
     buffer.clear();
 }
 
 void    Server::kick_command(Parser &parser, int fd)
 {
-    //check if the client is operator
-    //check if the client is in the chan
-    //check if the client to kick is in the chan and exists
-    //check if the chan exists
-    //kick multiple client : /KICK user1,user2 chan :message
     std::string chan_name = parser._command[1];
     chan_name.erase(0, 1);
     std::vector<Client>::iterator client = this->get_client_by_fd(fd);
     std::vector<Client>::iterator client_to_kick = this->get_client_by_nick(parser._command[2]);
     std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
     std::vector<std::string>::iterator token = parser._command.begin();
+    if (parser._command.size() < 3)
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    else if ((client->_mode.find("o")) == std::string::npos)
+    {
+        std::string buffer(ERR_NOPRIVILEGES(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    else if (client_to_kick == this->_clients.end())
+    {
+        std::string buffer(ERR_NOSUCHNICK(this->_server_name, client->_nickname, parser._command[2]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    else if (channel == this->_channels.end())
+    {
+        std::string buffer(ERR_NOSUCHCHAN(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+    else if (!channel->is_in_channel(client->_nickname))
+    {
+        std::string buffer(ERR_NOTONCHANNEL(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;  
+    }
+    else if (!channel->is_in_channel(client_to_kick->_nickname))
+    {
+        std::string buffer(ERR_NOTONCHANNEL(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;  
+    }
+    
     channel->remove_client(client_to_kick.base());
     std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip);
     for (; token != parser._command.end(); token++)
@@ -361,11 +603,124 @@ void Server::part_command(Parser &parser, int fd)
     channel->remove_client(client.base());
     std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip);
     buffer.append(" PART").append(" :" + parser._command[1]).append("\r\n");
-    cout << buffer << endl;
+    // cout << buffer << endl;
     send(fd, buffer.c_str(), buffer.size(), 0);
 }
 
+void Server::quit_command(Parser &parser, int fd)
+{
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+    std::string buffer("ERROR :Closing link: (" + client->_user_name + "@" + client->_ip + ") " + "[Quit: ");
+    if (parser._command.size() == 2)
+        buffer.append(parser._command[1] + "]");
+    else
+        buffer.append("leaving]");
+    send(fd, buffer.c_str(), buffer.size(), 0);
+	FD_CLR(fd, &_current_sockets);//clear the fd from de the fd_set and close it
+	close(fd);
+}
+
+void Server::notice_command(Parser &parser, int fd)
+{
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+    std::vector<Client>::iterator client_to_notice = this->get_client_by_nick(parser._command[1]);
+    if (parser._command.size() < 3)
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    if (client_to_notice == this->_clients.end())
+    {
+        std::string buffer(ERR_NOSUCHNICK(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    size_t i = 3;
+    std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip + " NOTICE " + parser._command[1] + " :");
+    buffer.append(parser._command[2].erase(0, 1));
+    for (; i < parser._command.size(); i++)
+        buffer.append(" " + parser._command[i]);
+    buffer.append("\r\n");
+    send(fd, buffer.c_str(), buffer.size(), 0);
+    send(client_to_notice->_socket, buffer.c_str(), buffer.size(), 0);
+}
+
+void Server::oper_command(Parser &parser, int fd)
+{
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+    std::vector<Client>::iterator client_to_upgrade = this->get_client_by_nick(parser._command[1]);
+    if (parser._command.size() < 3)
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    else if (parser._command[2] != this->_operator_password)//password doesn't match
+    {
+        std::string buffer(ERR_PASSWDMISMATCH(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    else if (client_to_upgrade == this->_clients.end())//client to upgrade doesn't exist
+    {
+        std::string buffer(ERR_NOSUCHNICK(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    client->_mode.push_back('o');
+    std::string buffer(RPL_YOUREOPER(this->_server_name, client->_nickname));
+    // buffer.append(":").append(client->_nickname).append("!").append(client->_user_name).append("@").append(client->_ip).append(" MODE ").append(client->_nickname).append(" :").append("+o").append("\r\n");
+    send(fd, buffer.c_str(), buffer.size(), 0);
+}
+
+
+void Server::kill_command(Parser &parser, int fd)
+{
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+    std::vector<Client>::iterator client_to_kill = this->get_client_by_nick(parser._command[1]);
+    if (parser._command.size() < 3)
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    else if ((client->_mode.find("o")) == std::string::npos)
+    {
+        std::string buffer(ERR_NOPRIVILEGES(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    else if (client_to_kill == this->_clients.end())
+    {
+        std::string buffer(ERR_NOSUCHNICK(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;   
+    }
+    std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip);
+    buffer.append(" KILL " + client_to_kill->_nickname + " :" + parser._command[1]);
+    send (fd, buffer.c_str(), buffer.size(), 0);
+    this->removeClient(fd);
+    FD_CLR(fd, &_current_sockets);//clear the fd from de the fd_set and close it
+	close(fd);
+    this->printAllUser();
+}
+
+void Server::die_command(Parser &parser, int fd)
+{
+    (void)parser;
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+    if ((client->_mode.find("o")) == std::string::npos)
+    {
+        std::string buffer(ERR_NOPRIVILEGES(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    else
+        status = 1;
+}
 ////////////////////////////////////////////UTILS
+
 void Server::printInfo(void)
 {
     cout << "SERVER PORT : " << this->_port << endl;
@@ -407,6 +762,13 @@ std::vector<Channel>::iterator Server::get_channel_by_name(std::string name)
 	return this->_channels.end();
 }
 
+void    Server::removeClient(int fd)
+{
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+    if (client == this->_clients.end())
+        return ;
+    this->_clients.erase(client);
+}
 
 void Server::printAllUser()
 {

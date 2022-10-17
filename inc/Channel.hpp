@@ -10,6 +10,8 @@ class Channel
         std::string             _channel_name;
         std::vector<Client*>    _clients;
         std::vector<Client*>    _operators;
+        Client                  *_first_op;
+        std::string             _mode;
         int                     _num_clients;
 
     public:
@@ -20,6 +22,8 @@ class Channel
         void add_new_client(Client *client);
         void remove_client(Client *client);
         void send_message_to_chan(std::string buffer, int sender);
+        int  is_in_channel(std::string nick);
+        int  is_op(std::string nick);
         
         void print_chan_info(void);
 };

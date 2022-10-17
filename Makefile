@@ -1,4 +1,4 @@
-CC			= c++ -Wall -Wextra -Werror -std=c++98 -g3 #-fsanitize=address
+CC			= c++ -Wall -Wextra -Werror -std=c++98 -g3
 RM			= rm -rf
 NAME		= ./ircserv
 NAME_SHORT	= ircserv

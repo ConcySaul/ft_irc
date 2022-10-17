@@ -13,6 +13,7 @@ class Client
         std::string _ip;
         std::string _mode;
         int         _socket;
+        int         _passed;
         
     public:
         Client(int socket, std::string ip);

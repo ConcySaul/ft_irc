@@ -3,6 +3,7 @@
 Client::Client(int socket, std::string ip)
 {
     this->_socket = socket;
+    this->_passed = 0;
     this->_ip = ip;
 }
 
