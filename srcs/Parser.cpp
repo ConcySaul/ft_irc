@@ -63,10 +63,10 @@ void     Parser::get_num_tokens(void)
 
 int    Parser::get_command_id(void)
 {
-    std::string commands[] = {"CAP", "PASS", "NICK", "USER", "MODE", "PING", "JOIN", "PRIVMSG", "KICK", "PART", "QUIT", "NOTICE", "OPER", "kill", "die"};
+    std::string commands[] = {"CAP", "PASS", "NICK", "USER", "MODE", "PING", "JOIN", "PRIVMSG", "KICK", "PART", "QUIT", "NOTICE", "OPER", "kill", "die", "wallops"};
     int i = 0;
     std::vector<std::string>::iterator it = this->_command.begin();
-    for (; i < 15; i++)
+    for (; i < 16; i++)
     {
         if (*it == commands[i])
             return (i);

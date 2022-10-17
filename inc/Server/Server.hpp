@@ -62,6 +62,7 @@ class Server
         void    oper_command(Parser &parser, int fd);
         void    kill_command(Parser &parser, int fd);
         void    die_command(Parser &parser, int fd);
+        void    wallops_command(Parser &parser, int fd);
         //utils
         void    send_to_client(std::string buffer, int fd);
 		int     getClient(void) { return this->_client; };
@@ -79,7 +80,7 @@ class Server
 #define RPL_WELCOME(servername, nick, username, ip) (":" + servername + " 001 " + nick + " :Welcome to the " + servername + " Network " + nick + "!" + username + "@" + ip + "\r\n")
 #define RPL_YOURHOST(servername, nick, version) (":" + servername + " 002 " + nick + " :Your host is " + servername + ", running version " + version + "\r\n")
 #define RPL_CREATED(servername, nick, date) (":" + servername + " 003 " + nick +  " :This server was created " + date + "\r\n")
-#define RPL_MYINFO(servername, nick, version, usr_modes, chann_modes) (":" + servername + " 004 " + nick  + " " + servername + " " + version + " " + usr_modes + " " + chann_modes + " :n\r\n")
+#define RPL_MYINFO(servername, nick, version, usr_modes, chan_modes) (":" + servername + " 004 " + nick  + " " + servername + " " + version + " " + usr_modes + " " + chan_modes + " :n\r\n")
 #define RPL_YOUREOPER(servername, nick) (":" + servername + " 381 " + nick + " :You are now an operator\r\n")
 
 //ERR_

@@ -136,11 +136,14 @@ void    Server::exec_query(int fd, std::string command)
         case 12 : //OPER_COMMAND (Upgrade a client to operator)
             oper_command(parser, fd);
             break;
-        case 13 : //KILL_COMMAND (Upgrade a client to operator)
+        case 13 : //KILL_COMMAND (remove a client from server)
             kill_command(parser, fd);
             break;
-        case 14 : //DIE_COMMAND (Upgrade a client to operator)
+        case 14 : //DIE_COMMAND (turn of server)
             die_command(parser, fd);
+            break;
+        case 15 : //WALLOPS_COMMAND (Upgrade a client to operator)
+            wallops_command(parser, fd);
             break;
     }
 }
@@ -221,7 +224,7 @@ void    Server::send_welcome(int fd)
     std::string buffer(RPL_WELCOME(this->_server_name, client->_nickname, client->_user_name, client->_ip));
 	buffer.append(RPL_YOURHOST(this->_server_name, client->_nickname, "IRCOKE.V1"));
 	buffer.append(RPL_CREATED(this->_server_name, client->_nickname, "27:04:27 AUG 38 2158"));
-	buffer.append(RPL_MYINFO(this->_server_name, client->_nickname, "IRCOKE.V1", "ow", "k"));
+	buffer.append(RPL_MYINFO(this->_server_name, client->_nickname, "IRCOKE.V1", "ow", "n"));
     // cout << "SEND : " << endl;
     // cout << buffer << endl;
     send(fd, buffer.c_str(), buffer.size(), 0);
@@ -670,7 +673,6 @@ void Server::oper_command(Parser &parser, int fd)
     }
     client->_mode.push_back('o');
     std::string buffer(RPL_YOUREOPER(this->_server_name, client->_nickname));
-    // buffer.append(":").append(client->_nickname).append("!").append(client->_user_name).append("@").append(client->_ip).append(" MODE ").append(client->_nickname).append(" :").append("+o").append("\r\n");
     send(fd, buffer.c_str(), buffer.size(), 0);
 }
 
@@ -718,6 +720,38 @@ void Server::die_command(Parser &parser, int fd)
     }
     else
         status = 1;
+}
+
+void Server::wallops_command(Parser &parser, int fd)
+{
+    size_t pos;
+    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+    std::vector<Client>::iterator start = this->_clients.begin();
+
+    if (parser._command.size() < 2)
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
+    else if ((pos = client->_mode.find("o")) == std::string::npos)
+    {
+        std::string buffer(ERR_NOPRIVILEGES(this->_server_name, client->_nickname));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;      
+    }
+    for (;start != this->_clients.end(); start++)
+    {
+        if ((pos = start->_mode.find("w")) != std::string::npos)
+        {
+            std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip);
+            buffer.append(" wallops");
+            for (size_t i = 1; i < parser._command.size(); i++)
+                buffer.append(" " + parser._command[i]);
+            cout << buffer << endl;
+            send(fd, buffer.c_str(), sizeof(buffer), 0);
+        }
+    }
 }
 ////////////////////////////////////////////UTILS
 
