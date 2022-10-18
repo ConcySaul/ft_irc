@@ -1,4 +1,3 @@
 KICK done
-wallops 
 KILL done
 DIE done

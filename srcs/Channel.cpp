@@ -14,6 +14,8 @@ Channel::Channel(std::string name, Client *client)
     this->_num_clients = 1;
     this->_first_op = client;
     this->_mode = "";
+    this->_key = "";
+    this->_max_clients = 99;
 }
 
 Channel::~Channel(){}
@@ -27,6 +29,20 @@ void Channel::add_new_client(Client *client)
 void Channel::remove_client(Client *client)
 {
     std::vector<Client*>::iterator start = this->_clients.begin();
+    for (; start != this->_clients.end(); start++)
+    {
+        if ((*start)->_nickname == client->_nickname)
+        {
+            this->_clients.erase(start);
+            break;
+        }
+    }
+    this->_num_clients--;
+}
+
+void Channel::remove_operator(Client *client)
+{
+    std::vector<Client*>::iterator start = this->_operators.begin();
     for (; start != this->_clients.end(); start++)
     {
         if ((*start)->_nickname == client->_nickname)

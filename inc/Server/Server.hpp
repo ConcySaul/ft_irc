@@ -6,6 +6,7 @@
 #include "../Channel.hpp"
 
 #define MAX_CLIENT 5
+extern int status;
 
 class Server
 {
@@ -98,6 +99,8 @@ class Server
 #define ERR_ALREADYREGISTERED(servername, nick) (":" + servername + " 462 " + nick + " :You are already registered\r\n")
 #define ERR_NOPERMFORHOST(servername, nick) (":" + servername + " 463 " + nick + " :Permission not granted\r\n")
 #define ERR_PASSWDMISMATCH(servername, nick) (":" + servername + " 464 " + nick + " :Wrong password... Try again\r\n")
+#define ERR_KEYSET(servername, nick, chan) (":" + servername + " 467 " + nick + " " + chan + " :Key is missing or wrong\r\n")
+#define ERR_CHANNELISFULL(servername, nick, chan) (":" + servername + " 471 " + nick + " " + chan + " :Channel is full\r\n")
 #define ERR_NOPRIVILEGES(servername, nick) (":" + servername + " 481 " + nick + " :You must be an operator\r\n")
 #define ERR_USERSDONTMATCH(servername, nick) (":" + servername + " 502 " + nick + " :You can't change \r\n")
 #define ERR_UNKNOWNMODE(servername, nick, char, modes) (":" + servername + " 572 " + nick + " " + char + " :Unknown user mode. (Valid mode " + modes +")\r\n")
