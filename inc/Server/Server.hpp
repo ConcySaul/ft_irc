@@ -5,7 +5,7 @@
 #include "../Client/Client.hpp"
 #include "../Channel.hpp"
 
-#define MAX_CLIENT 5
+#define MAX_CLIENT 2
 extern int status;
 
 class Server
@@ -83,7 +83,7 @@ class Server
 #define RPL_CREATED(servername, nick, date) (":" + servername + " 003 " + nick +  " :This server was created " + date + "\r\n")
 #define RPL_MYINFO(servername, nick, version, usr_modes, chan_modes) (":" + servername + " 004 " + nick  + " " + servername + " " + version + " " + usr_modes + " " + chan_modes + " :n\r\n")
 #define RPL_YOUREOPER(servername, nick) (":" + servername + " 381 " + nick + " :You are now an operator\r\n")
-
+#define RPL_TOPIC(servername, nick, chan) (":" + servername + " 332 " + nick + " " + chan + " :WELCOME TO " + chan + " Channel operator commands : l :\tset max client per channel, k :\tset a key for joining, n :\tmust be in the room to send a message, o :\t add/remove an operator,  s :\tset the room as \"secret\"\r\n")
 //ERR_
 #define ERR_NOSUCHNICK(servername, nick, nickname) (":" + servername + " 401 " + nick + " " + nickname + " :No such nickname\r\n")
 #define ERR_NOSUCHSERVER(servername, nick, server) (":" + servername + " 402 " + nick + " " + server + " :No such server\r\n")
