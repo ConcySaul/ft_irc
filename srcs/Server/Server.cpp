@@ -151,7 +151,7 @@ void    Server::handle_request(int fd)
     bytes_read = recv(fd, buffer, 1024, 0);
     if (bytes_read <= 0)
     {
-        this->get_client_by_fd(fd);
+        // this->get_client_by_fd(fd);
         this->removeClient(fd);
         return ;
     }
@@ -280,7 +280,6 @@ void    Server::removeClient(int fd)
     FD_CLR(fd, &_current_sockets);
     close(fd);
     this->_clients.erase(client);
-
 }
 
 void Server::printAllUser()

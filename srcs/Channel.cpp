@@ -33,6 +33,7 @@ void Channel::remove_client(Client *client)
     {
         if ((*start)->_nickname == client->_nickname)
         {
+            cout << "REMOVED" << endl;
             this->_clients.erase(start);
             break;
         }
@@ -70,7 +71,10 @@ int Channel::is_in_channel(std::string nick)
     for (; client != this->_clients.end(); client++)
     {
         if ((*client)->_nickname == nick)
+        {
+            cout << "CLiENT FOUND" << endl;
             return (1);
+        }
     }
     return (0);
 }

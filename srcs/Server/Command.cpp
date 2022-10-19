@@ -12,6 +12,12 @@ void    Server::pass_command(Parser &parser, int fd)
         send(fd, buffer.c_str(), buffer.size(), 0);
 		return ;
     }
+    else if (parser._command.size() < 2) //if the client isn't connected
+    {
+        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
+    }
     else if (!client->_nickname.empty()) //if the user is already registered
     {
         std::string buffer(ERR_ALREADYREGISTERED(this->_server_name, client->_nickname));
@@ -32,7 +38,6 @@ void    Server::nick_command(Parser &parser, int fd)
 {   
     // parser.print_parsed_command();
     std::vector<Client>::iterator client = this->get_client_by_fd(fd);
-    std::vector<Client>::iterator client_to_test = this->get_client_by_nick(parser._command[1]);
 	if (client == this->_clients.end())//if the client isn't connected
     {
         std::string buffer(ERR_NOTREGISTERED(this->_server_name, ""));
@@ -51,7 +56,10 @@ void    Server::nick_command(Parser &parser, int fd)
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;
     }
-    else if (client_to_test != this->_clients.end()) //if nick is already used
+
+    std::vector<Client>::iterator client_to_test = this->get_client_by_nick(parser._command[1]);
+
+    if (client_to_test != this->_clients.end()) //if nick is already used
     {
         std::string buffer(ERR_NICKNAMEINUSE(this->_server_name, parser._command[1]));
         send(fd, buffer.c_str(), buffer.size(), 0);
@@ -339,9 +347,9 @@ void    Server::join_command(Parser &parser, int fd)
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;  
     }
-    else // channel already exists, so we add the client to it
+    else   // channel already exists, so we add the client to it
         channel->add_new_client(client.base());
-        
+
     std::string buffer("");
     buffer.append(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip + " JOIN :" + parser._command[1]).append("\r\n");
     buffer.append(RPL_TOPIC(this->_server_name, client->_nickname, parser._command[1]));
