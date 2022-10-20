@@ -63,9 +63,10 @@ class Server
         void    oper_command(Parser &parser, int fd);
         void    kill_command(Parser &parser, int fd);
         void    die_command(Parser &parser, int fd);
-        void    wallops_command(Parser &parser, int fd);
+        void    unknown_command(Parser &parser, int fd);
         //utils
         void    send_to_client(std::string buffer, int fd);
+        void    send_to_chan(std::string chan, std::string buffer, int fd);
 		int     getClient(void) { return this->_client; };
         int     getServer(void) { return this->_server; };
         void    removeClient(int fd);
@@ -88,12 +89,13 @@ class Server
 #define ERR_NOSUCHNICK(servername, nick, nickname) (":" + servername + " 401 " + nick + " " + nickname + " :No such nickname\r\n")
 #define ERR_NOSUCHSERVER(servername, nick, server) (":" + servername + " 402 " + nick + " " + server + " :No such server\r\n")
 #define ERR_NOSUCHCHAN(servername, nick, chan) (":" + servername + " 403 " + nick + " " + chan + " :No such channel\r\n")
-#define ERR_CANNOTSENDTOCHAN(servername, nick, chan) (":" + servername + " 404 " + nick + " " + chan + " :You must be in the room to send a message (+n enabled)\r\n")
+#define ERR_CANNOTSENDTOCHAN(servername, nick, chan) (":" + servername + " 404 " + nick + " " + chan + " :You must be in the room\r\n")
 #define ERR_NOORIGIN(servername, nick) (":" + servername + " 409 " + nick + " :No origin\r\n")
+#define ERR_UNKNOWNCOMMAND(servername, nick, command) (":" + servername + " 421 " + nick + " " + command + " :Unkwown command\r\n")
 #define ERR_NONICKNAMEGIVEN(servername, nick) (":" + servername + " 431 " + nick + " :Nickname not given\r\n")
 #define ERR_ERRONEUSNICKNAME(servername, nick) (":" + servername + " 432 " + nick + " " + nick + " :Nickname invalid\r\n")
 #define ERR_NICKNAMEINUSE(servername, nick) (":" + servername + " 433 " + nick + " " + nick + " :Nickname already used\r\n")
-#define ERR_NOTONCHANNEL(servername, nick, chan) (":" + servername + " 442 " + nick + " " + chan + " :You must be in the room to modify it\r\n")
+#define ERR_NOTONCHANNEL(servername, nick, chan) (":" + servername + " 442 " + nick + " " + chan + " :You must be in the room\r\n")
 #define ERR_NOTREGISTERED(servername, nick) (":" + servername + " 451 " + nick + " :Not registered\r\n")
 #define ERR_NEEDMOREPARAMS(servername, nick, command) (":" + servername + " 461 " + nick + " " + command + " :Need more parameters\r\n")
 #define ERR_ALREADYREGISTERED(servername, nick) (":" + servername + " 462 " + nick + " :You are already registered\r\n")
@@ -101,8 +103,10 @@ class Server
 #define ERR_PASSWDMISMATCH(servername, nick) (":" + servername + " 464 " + nick + " :Wrong password... Try again\r\n")
 #define ERR_KEYSET(servername, nick, chan) (":" + servername + " 467 " + nick + " " + chan + " :Key is missing or wrong\r\n")
 #define ERR_CHANNELISFULL(servername, nick, chan) (":" + servername + " 471 " + nick + " " + chan + " :Channel is full\r\n")
+#define ERR_BANNEDFROMCHAN(servername, nick, chan) (":" + servername + " 471 " + nick + " " + chan + " :Banned from channel\r\n")
 #define ERR_NOPRIVILEGES(servername, nick) (":" + servername + " 481 " + nick + " :You must be an operator\r\n")
 #define ERR_USERSDONTMATCH(servername, nick) (":" + servername + " 502 " + nick + " :You can't change \r\n")
 #define ERR_UNKNOWNMODE(servername, nick, char, modes) (":" + servername + " 572 " + nick + " " + char + " :Unknown user mode. (Valid mode " + modes +")\r\n")
 #define ERR_CHANOPRIVSNEEDED(servername, nick, chan) (":" + servername + " 582 " + nick + " " + chan + " :You must be an operator\r\n")
+#define ERR_BADMASK(servername, nick, mask) (":" + servername + " 415 " + nick + " " + mask + " :Bad mask\r\n")
 #endif

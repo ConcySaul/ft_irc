@@ -2,6 +2,22 @@
 
 int status;
 
+int     bad_char(std::string test)
+{
+    std::string allowed("#qwertyuiopasdfghjklzxcvbnm0123456789");
+    size_t i = 0;
+    size_t pos;
+
+    for (; i < test.size(); i++)
+    {
+        if ((pos = allowed.find(test[i])) == std::string::npos)
+        {
+            return (1);
+        }
+    }
+    return (0);
+}
+
 void    Server::pass_command(Parser &parser, int fd)
 {   
     // parser.print_parsed_command();
@@ -109,14 +125,18 @@ void    Server::mode_command(Parser &parser, int fd)
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;
     }
-    else if (parser._command[1].find("#") == std::string::npos)//USER MODE
-    {
-        this->user_mode(parser, fd);
-        return ;
-    }
-    else if (parser._command[1].find("#") != std::string::npos)//CHANNEL MODE
+
+    std::string chan = parser._command[1];
+
+    if (chan[0] == '#')//CHANNEL MODE
     {
         this->channel_mode(parser, fd);
+        return ;
+    }
+    if (chan[0] != '#')//USER MODE
+    {
+        std::string buffer(ERR_NOPERMFORHOST(this->_server_name, client->_nickname));//not required in the subject, so... fuck it
+        send(fd, buffer.c_str(), buffer.size(), 0);
         return ;
     }
 }
@@ -199,14 +219,15 @@ void Server::channel_mode(Parser &parser, int fd)
         send(fd, buffer.c_str(), buffer.size(), 0);
         return; 
     }
-    else if (!channel->is_in_channel(client->_nickname))//client isn't in the chan
+    if (!channel->is_in_channel(client->_nickname))//client isn't in the chan
     {
         std::string buffer(ERR_CANNOTSENDTOCHAN(this->_server_name, client->_nickname, parser._command[1]));
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;   
     }
-    else if (!channel->is_op(client->_nickname))//client isn't an chan operator
+    if (!channel->is_op(client->_nickname))//client isn't an chan operator
     {
+        cout << "zesh" << endl;
         std::string buffer(ERR_CHANOPRIVSNEEDED(this->_server_name, client->_nickname, parser._command[1]));
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;     
@@ -242,10 +263,22 @@ void Server::channel_mode(Parser &parser, int fd)
                         token++;
                         continue ;
                     }
-                    channel->_operators.push_back(client.base());
+                    channel->_operators.push_back(client->_nickname);
                     token++;
                 }
-                channel->_mode.push_back(mode[i]);
+                if (mode[i] == 'b' && token <= parser._command.size())//add new ban
+                {
+                    std::vector<Client>::iterator client = this->get_client_by_nick(parser._command[token]);
+                    if (client == this->_clients.end())//if the client doesn't exist
+                    {
+                        token++;
+                        continue ;
+                    }
+                    channel->_banned.push_back(client->_nickname);
+                    token++;
+                }
+                if ((pos = channel->_mode.find(mode[i])) == std::string::npos)
+                    channel->_mode.push_back(mode[i]);
             }
             else if (flag == 0)//if mode is -
             {
@@ -257,7 +290,18 @@ void Server::channel_mode(Parser &parser, int fd)
                         token++;
                         continue ;
                     }
-                    channel->remove_operator(client.base());
+                    channel->remove_operator(client->_nickname);
+                    token++;
+                }
+               if (mode[i] == 'b' && token <= parser._command.size())//delete ban
+                {
+                    std::vector<Client>::iterator client = this->get_client_by_nick(parser._command[token]);
+                    if (client == this->_clients.end())
+                    {
+                        token++;
+                        continue ;
+                    }
+                    channel->remove_ban(parser._command[token]);
                     token++;
                 }
                 if ((pos = channel->_mode.find(mode[i])) != std::string::npos)
@@ -307,7 +351,6 @@ void    Server::join_command(Parser &parser, int fd)
     // parser.print_parsed_command();
     std::vector<Client>::iterator client = get_client_by_fd(fd);
     size_t pos;
-
     if (parser._command.size() < 2)//not enough parameters
     {
         std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
@@ -316,17 +359,37 @@ void    Server::join_command(Parser &parser, int fd)
     }
 
     std::string chan_name = parser._command[1];
+
+    if (chan_name[0] != '#' || bad_char(chan_name))
+    {
+        std::string buffer(ERR_BADMASK(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+
     chan_name.erase(0, 1);
     std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
 
     if (channel == this->_channels.end())//channel doesn't exist
     {
         cout << "CREATING NEW CHANNEL" << endl;
-        Channel new_channel(chan_name, client.base());
+        Channel new_channel(chan_name, client->_nickname);
+        // channel->_operators.push_back(client->_nickname);
         this->_channels.push_back(new_channel);
-        // new_channel.print_chan_info();
+        std::string buffer("");
+        buffer.append(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip + " JOIN :" + parser._command[1]).append("\r\n");
+        buffer.append(RPL_TOPIC(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        buffer.clear();
+        return ;
     }
-    else if (channel->_mode.find('k') != std::string::npos)//if key is needed to join
+    if (channel->is_banned(client->_nickname))
+    {
+        std::string buffer(ERR_BANNEDFROMCHAN(this->_server_name, client->_nickname, channel->_channel_name));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;   
+    }
+    if (channel->_mode.find('k') != std::string::npos)//if key is needed to join
     {
         if (parser._command.size() < 3)
         {
@@ -341,20 +404,22 @@ void    Server::join_command(Parser &parser, int fd)
             return;  
         }
     }
-    else if ((pos = channel->_mode.find('l') != std::string::npos) && (channel->_max_clients == channel->_num_clients)) //channel is full
+    if ((pos = channel->_mode.find('l') != std::string::npos) && (channel->_max_clients == channel->_num_clients)) //channel is full
     {
         std::string buffer(ERR_CHANNELISFULL(this->_server_name, client->_nickname, channel->_channel_name));
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;  
     }
-    else   // channel already exists, so we add the client to it
-        channel->add_new_client(client.base());
-
-    std::string buffer("");
-    buffer.append(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip + " JOIN :" + parser._command[1]).append("\r\n");
-    buffer.append(RPL_TOPIC(this->_server_name, client->_nickname, parser._command[1]));
-    send(fd, buffer.c_str(), buffer.size(), 0);
-    buffer.clear();
+    else 
+    { // channel already exists, so we add the client to it
+        channel->add_new_client(client->_nickname);
+        std::string buffer("");
+        buffer.append(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip + " JOIN :" + parser._command[1]).append("\r\n");
+        buffer.append(RPL_TOPIC(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        buffer.clear();
+        return ;
+    }
     
 }
 
@@ -370,6 +435,14 @@ void    Server::privmsg_command(Parser &parser, int fd)
     }
 
     std::string chan_name = parser._command[1];
+
+    if (chan_name[0] != '#')
+    {
+        std::string buffer(ERR_BADMASK(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+
     chan_name.erase(0, 1);
     std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
 
@@ -393,7 +466,7 @@ void    Server::privmsg_command(Parser &parser, int fd)
         buffer.append(" " + parser._command[i]);
     buffer.append("\r\n");
     // cout << buffer << endl;
-    channel->send_message_to_chan(buffer, fd);
+    this->send_to_chan(channel->_channel_name, buffer, fd);
     buffer.clear();
 }
 
@@ -444,12 +517,12 @@ void    Server::kick_command(Parser &parser, int fd)
         return;  
     }
     
-    channel->remove_client(client_to_kick.base());
+    channel->remove_client(client_to_kick->_nickname);
     std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip);
     for (; token != parser._command.end(); token++)
         buffer.append(" " + *token);
     buffer.append("\r\n");
-    channel->send_message_to_chan(buffer, fd);
+    this->send_to_chan(channel->_channel_name, buffer, fd);
     // channel->print_chan_info();
 }
 
@@ -457,7 +530,6 @@ void Server::part_command(Parser &parser, int fd)
 {
     //check if the client is in the channel
     std::vector<Client>::iterator client = this->get_client_by_fd(fd);
-
     if (parser._command.size() < 2)
     {
         std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
@@ -466,6 +538,14 @@ void Server::part_command(Parser &parser, int fd)
     }
 
     std::string chan_name = parser._command[1];
+
+    if (chan_name[0] != '#')
+    {
+        std::string buffer(ERR_BADMASK(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;
+    }
+
     chan_name.erase(0, 1);
     std::vector<Channel>::iterator channel = this->get_channel_by_name(chan_name);
 
@@ -481,7 +561,7 @@ void Server::part_command(Parser &parser, int fd)
         send(fd, buffer.c_str(), buffer.size(), 0);
         return; 
     }
-    channel->remove_client(client.base());
+    channel->remove_client(client->_nickname);
     std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip);
     buffer.append(" PART").append(" :" + parser._command[1]).append("\r\n");
     send(fd, buffer.c_str(), buffer.size(), 0);
@@ -495,6 +575,7 @@ void Server::quit_command(Parser &parser, int fd)
         buffer.append(parser._command[1] + "]");
     else
         buffer.append("leaving]");
+    this->removeClient(fd);
     send(fd, buffer.c_str(), buffer.size(), 0);
 	FD_CLR(fd, &_current_sockets);//clear the fd from de the fd_set and close it
 	close(fd);
@@ -597,4 +678,12 @@ void Server::die_command(Parser &parser, int fd)
     }
     else
         status = 1;
+}
+
+void Server::unknown_command(Parser &parser, int fd)
+{
+        std::vector<Client>::iterator client = this->get_client_by_fd(fd);
+        std::string buffer(ERR_UNKNOWNCOMMAND(this->_server_name, client->_nickname, parser._command[0]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+		return ;
 }

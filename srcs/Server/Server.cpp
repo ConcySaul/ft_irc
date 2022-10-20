@@ -139,7 +139,10 @@ void    Server::exec_query(int fd, std::string command)
             break;                                           //                            |
         case 14 : //DIE_COMMAND (turn off server)                                          |
             die_command(parser, fd);                         //                            |
-            break;                                           //                           __ 
+            break;                                           //
+        default :
+            unknown_command(parser, fd);
+            break;
     }
 }
 
@@ -219,7 +222,7 @@ void    Server::send_welcome(int fd)
     std::string buffer(RPL_WELCOME(this->_server_name, client->_nickname, client->_user_name, client->_ip));
 	buffer.append(RPL_YOURHOST(this->_server_name, client->_nickname, "IRCOKE.V1"));
 	buffer.append(RPL_CREATED(this->_server_name, client->_nickname, "27:04:27 AUG 38 2158"));
-	buffer.append(RPL_MYINFO(this->_server_name, client->_nickname, "IRCOKE.V1", "oi", "nslok"));
+	buffer.append(RPL_MYINFO(this->_server_name, client->_nickname, "IRCOKE.V1", "oi", "nblok"));
     // cout << "SEND : " << endl;
     // cout << buffer << endl;
     send(fd, buffer.c_str(), buffer.size(), 0);
@@ -280,6 +283,7 @@ void    Server::removeClient(int fd)
     FD_CLR(fd, &_current_sockets);
     close(fd);
     this->_clients.erase(client);
+    this->_num_clients--;
 }
 
 void Server::printAllUser()
@@ -301,4 +305,17 @@ void Server::clear_all_socks()
 		}
 	}
 	FD_ZERO(&_current_sockets);
+}
+
+void    Server::send_to_chan(std::string chan, std::string buffer, int fd)
+{
+    std::vector<Client>::iterator client = get_client_by_fd(fd);
+    std::vector<Channel>::iterator channel = get_channel_by_name(chan);
+    std::vector<std::string>::iterator start = channel->_clients.begin();
+    for (; start != channel->_clients.end(); start++)
+    {
+        std::vector<Client>::iterator client2 = get_client_by_nick((*start));
+        if ( client->_socket != client2->_socket)
+            send(client2->_socket, buffer.c_str(), buffer.size(), 0);
+    }
 }
