@@ -28,7 +28,7 @@ void    Server::pass_command(Parser &parser, int fd)
         send(fd, buffer.c_str(), buffer.size(), 0);
 		return ;
     }
-    else if (parser._command.size() < 2) //if the client isn't connected
+    else if (parser._command.size() != 2) //if the client isn't connected
     {
         std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
         send(fd, buffer.c_str(), buffer.size(), 0);
@@ -95,7 +95,7 @@ void    Server::user_command(Parser &parser, int fd)
         send(fd, buffer.c_str(), buffer.size(), 0);
 		return ;
     }
-    else if (parser._command.size() < 4)//if some params are missing
+    else if (parser._command.size() != 5)//if some params are missing
     {
         std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
         send(fd, buffer.c_str(), buffer.size(), 0);
@@ -227,8 +227,14 @@ void Server::channel_mode(Parser &parser, int fd)
     }
     if (!channel->is_op(client->_nickname))//client isn't an chan operator
     {
-        cout << "zesh" << endl;
         std::string buffer(ERR_CHANOPRIVSNEEDED(this->_server_name, client->_nickname, parser._command[1]));
+        send(fd, buffer.c_str(), buffer.size(), 0);
+        return;     
+    }
+
+    if (mode[0] != '-' && mode[0] != '+')
+    {
+        std::string buffer(ERR_BADMASK(this->_server_name, client->_nickname, mode));
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;     
     }
@@ -473,7 +479,7 @@ void    Server::privmsg_command(Parser &parser, int fd)
 void    Server::kick_command(Parser &parser, int fd)
 {
     std::vector<Client>::iterator client = this->get_client_by_fd(fd);
-    std::vector<std::string>::iterator token = parser._command.begin();
+
     if (parser._command.size() < 3)//if missing param(s)
     {
         std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
@@ -492,38 +498,40 @@ void    Server::kick_command(Parser &parser, int fd)
         send(fd, buffer.c_str(), buffer.size(), 0);
 		return ;
     }
-    else if (client_to_kick == this->_clients.end())//client to kick doesn't exist
+    if (client_to_kick == this->_clients.end())//client to kick doesn't exist
     {
         std::string buffer(ERR_NOSUCHNICK(this->_server_name, client->_nickname, parser._command[2]));
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;
     }
-    else if (channel == this->_channels.end())//channel to kick doesn't exist
+    if (channel == this->_channels.end())//channel to kick doesn't exist
     {
         std::string buffer(ERR_NOSUCHCHAN(this->_server_name, client->_nickname, parser._command[1]));
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;
     }
-    else if (!channel->is_in_channel(client->_nickname))//the client isn't in the channel
+    if (!channel->is_in_channel(client->_nickname))//the client isn't in the channel
     {
-        std::string buffer(ERR_NOTONCHANNEL(this->_server_name, client->_nickname, parser._command[1]));
+        std::string buffer(ERR_NOTONCHANNEL(this->_server_name, client->_nickname, client->_nickname));
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;  
     }
-    else if (!channel->is_in_channel(client_to_kick->_nickname))//the client to kick isn't in the channel
+    if (!channel->is_in_channel(client_to_kick->_nickname))//the client to kick isn't in the channel
     {
         std::string buffer(ERR_NOTONCHANNEL(this->_server_name, client->_nickname, parser._command[1]));
         send(fd, buffer.c_str(), buffer.size(), 0);
         return;  
     }
     
-    channel->remove_client(client_to_kick->_nickname);
+    std::vector<std::string>::iterator token = parser._command.begin();
     std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip);
     for (; token != parser._command.end(); token++)
         buffer.append(" " + *token);
+    buffer.append(" :" + client->_nickname);
     buffer.append("\r\n");
     this->send_to_chan(channel->_channel_name, buffer, fd);
-    // channel->print_chan_info();
+    channel->remove_client(client_to_kick->_nickname);
+    // channel->print!_chan_info();
 }
 
 void Server::part_command(Parser &parser, int fd)
@@ -584,13 +592,15 @@ void Server::quit_command(Parser &parser, int fd)
 void Server::notice_command(Parser &parser, int fd)
 {
     std::vector<Client>::iterator client = this->get_client_by_fd(fd);
-    std::vector<Client>::iterator client_to_notice = this->get_client_by_nick(parser._command[1]);
     if (parser._command.size() < 3)// if missing param(s)
     {
         std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
         send(fd, buffer.c_str(), buffer.size(), 0);
 		return ;
     }
+
+    std::vector<Client>::iterator client_to_notice = this->get_client_by_nick(parser._command[1]);
+    
     if (client_to_notice == this->_clients.end())//if the client to notice doesn't exist
     {
         std::string buffer(ERR_NOSUCHNICK(this->_server_name, client->_nickname, parser._command[1]));
@@ -603,7 +613,6 @@ void Server::notice_command(Parser &parser, int fd)
     for (; i < parser._command.size(); i++)
         buffer.append(" " + parser._command[i]);
     buffer.append("\r\n");
-    send(fd, buffer.c_str(), buffer.size(), 0);
     send(client_to_notice->_socket, buffer.c_str(), buffer.size(), 0);
 }
 
@@ -632,38 +641,6 @@ void Server::oper_command(Parser &parser, int fd)
     client->_mode.push_back('o');
     std::string buffer(RPL_YOUREOPER(this->_server_name, client->_nickname));
     send(fd, buffer.c_str(), buffer.size(), 0);
-}
-
-
-void Server::kill_command(Parser &parser, int fd)
-{
-    std::vector<Client>::iterator client = this->get_client_by_fd(fd);
-    std::vector<Client>::iterator client_to_kill = this->get_client_by_nick(parser._command[1]);
-    if (parser._command.size() < 3)
-    {
-        std::string buffer(ERR_NEEDMOREPARAMS(this->_server_name, client->_nickname, parser._command[0]));
-        send(fd, buffer.c_str(), buffer.size(), 0);
-		return ;
-    }
-    else if ((client->_mode.find("o")) == std::string::npos)// if not server operator
-    {
-        std::string buffer(ERR_NOPRIVILEGES(this->_server_name, client->_nickname));
-        send(fd, buffer.c_str(), buffer.size(), 0);
-		return ;
-    }
-    else if (client_to_kill == this->_clients.end()) // client to kill doesn't exist
-    {
-        std::string buffer(ERR_NOSUCHNICK(this->_server_name, client->_nickname, parser._command[1]));
-        send(fd, buffer.c_str(), buffer.size(), 0);
-		return ;   
-    }
-    std::string buffer(":" + client->_nickname + "!" + client->_user_name + "@" + client->_ip);
-    buffer.append(" KILL " + client_to_kill->_nickname + " :" + parser._command[1]);
-    send (fd, buffer.c_str(), buffer.size(), 0);
-    this->removeClient(fd);
-    FD_CLR(fd, &_current_sockets);//clear the fd from de the fd_set and close it
-	close(fd);
-    this->printAllUser();
 }
 
 void Server::die_command(Parser &parser, int fd)

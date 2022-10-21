@@ -133,11 +133,8 @@ void    Server::exec_query(int fd, std::string command)
             break;
         case 12 : //OPER_COMMAND (Upgrade a client to operator)                         
             oper_command(parser, fd);                                          
-            break;
-        case 13 : //KILL_COMMAND (remove a client from server)                            __
-            kill_command(parser, fd);                        //                            |    SERV OPERTOR ONLY
-            break;                                           //                            |
-        case 14 : //DIE_COMMAND (turn off server)                                          |
+            break;                                     //                            |
+        case 13 : //DIE_COMMAND (turn off server)                                          |
             die_command(parser, fd);                         //                            |
             break;                                           //
         default :
@@ -309,6 +306,7 @@ void Server::clear_all_socks()
 
 void    Server::send_to_chan(std::string chan, std::string buffer, int fd)
 {
+    cout << buffer << endl;
     std::vector<Client>::iterator client = get_client_by_fd(fd);
     std::vector<Channel>::iterator channel = get_channel_by_name(chan);
     std::vector<std::string>::iterator start = channel->_clients.begin();

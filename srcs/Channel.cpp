@@ -89,12 +89,13 @@ int Channel::is_banned(std::string nick)
 
 void Channel::remove_ban(std::string client_nick)
 {
+    cout << client_nick << endl;
     std::vector<std::string>::iterator banned = this->_banned.begin();
     for (; banned != this->_banned.end(); banned++)
     {
         if (*banned == client_nick)
         {
-            this->_operators.erase(banned);
+            this->_banned.erase(banned);
             break;
         }
     }
